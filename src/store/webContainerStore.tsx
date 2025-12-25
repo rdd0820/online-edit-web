@@ -25,7 +25,6 @@ export const useWebContainerStore = create<WebContainerStore>((set, get) => ({
   async initWebContainer(projectId = '') {
     const { webContainerInstance, isInitialized } = get();
     const projectInfo = await localforage.getItem(projectId);
-    console.log('projectInfo', projectInfo);
 
     if (!isInitialized && !webContainerInstance) {
       const newWebContainerInstance = await WebContainer.boot();
@@ -65,7 +64,6 @@ export const useWebContainerStore = create<WebContainerStore>((set, get) => ({
     } else {
       if (projectInfo) {
         const { projectFileData } = JSON.parse(projectInfo as any);
-        console.log('projectFileData1', projectFileData);
         await writeDirByLocal(projectFileData, webContainerInstance as WebContainer);
       }
 

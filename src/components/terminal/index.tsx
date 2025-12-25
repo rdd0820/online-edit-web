@@ -22,11 +22,13 @@ export interface TerminalPanelRefInterface {
  * @param terminal - xterm.js 终端实例
  *
  * 执行流程:
- * 1. 切换到项目目录 (cd /react)
- * 2. 安装依赖 (pnpm install)
- * 3. 启动开发服务器 (pnpm dev)
+ * 1. 等待并检查项目目录是否存在
+ * 2. 切换到项目目录 (cd /react)
+ * 3. 安装依赖 (pnpm install)
+ * 4. 启动开发服务器 (pnpm dev)
  *
  * 技术细节:
+ * - 添加目录存在性检查,避免 ENOENT 错误
  * - spawn() 创建独立进程执行命令
  * - 每个命令等待前一个命令完成(串行执行)
  * - 实时将输出流传输到终端显示
@@ -34,6 +36,48 @@ export interface TerminalPanelRefInterface {
  */
 async function executeAutoCommands(webContainerInstance: any, terminal: any): Promise<void> {
   try {
+    /**
+     * 等待 /react 目录创建
+     *
+     * 问题背景:
+     * - WebContainer 初始化和文件写入是异步操作
+     * - 如果立即执行命令,/react 目录可能还未创建完成
+     * - 导致 spawn 报错: ENOENT (no such file or directory)
+     *
+     * 解决方案:
+     * - 轮询检查目录是否存在
+     * - 最多等待 10 秒,每 200ms 检查一次
+     * - 超时则提示用户并中断执行
+     */
+    const maxRetries = 50; // 最多重试 50 次 (10秒)
+    const retryInterval = 200; // 每次间隔 200ms
+    let reactDirExists = false;
+
+    terminal.writeln('\r\n\x1b[1;36m⏳ 等待项目目录初始化...\x1b[0m\r\n');
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        // 尝试读取 /react 目录,如果存在则不会抛出异常
+        await webContainerInstance.fs.readdir('/react');
+        reactDirExists = true;
+        terminal.writeln('\x1b[1;32m✅ 项目目录已就绪\x1b[0m\r\n');
+        break;
+      } catch (error) {
+        console.log('Directory does not exist, retrying...');
+        // 目录不存在,等待后重试
+        await new Promise((resolve) => setTimeout(resolve, retryInterval));
+      }
+    }
+
+    // 如果超时仍未找到目录,中断执行
+    if (!reactDirExists) {
+      terminal.writeln(
+        '\r\n\x1b[1;31m❌ 错误: /react 目录未找到,请确保项目文件已正确加载\x1b[0m\r\n',
+      );
+
+      return;
+    }
+
     /**
      * 定义要执行的命令序列
      * 每个命令包含:
