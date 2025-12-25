@@ -180,7 +180,10 @@ export default function CodeEditor({ editorId }: CodeEditorProps) {
   );
 
   const handleEditorChange = (value: string = ''): void => {
+    // 1. 更新本地状态（用于 Monaco Editor 显示）
     currentId && updateItem(currentId, { value });
+    // 2. 写入 WebContainer 虚拟文件系统
+    // ⭐ 关键：这一步触发了 HMR 机制
     webContainerInstance && writeFile(currentPath, value, webContainerInstance);
   };
 
